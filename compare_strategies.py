@@ -1,12 +1,8 @@
+import pandas as pd
+
 from src.data_loader import get_data
 
-from src.indicators import (
-    sma,
-    ema,
-    rsi,
-    macd,
-    bollinger_bands
-)
+from src.indicators import sma, ema, rsi, macd, bollinger_bands
 
 from src.strategies import (
     SMACrossoverStrategy,
@@ -14,7 +10,7 @@ from src.strategies import (
     MACDStrategy,
     BollingerStrategy,
     PriceAboveSMAStrategy,
-    EMACrossoverStrategy
+    EMACrossoverStrategy,
 )
 
 from src.backtester import Backtester
@@ -24,35 +20,21 @@ from src.metrics import (
     win_rate,
     profit_factor,
     max_drawdown,
-    sharpe_ratio
+    sharpe_ratio,
 )
 
-from src.benchmark import (
-    buy_and_hold_return
-)
+from src.benchmark import buy_and_hold_return
+
+from src.reporting import save_trade_log, save_metrics, save_dataframe
+
+from src.visualization import plot_equity_curve, plot_drawdown, plot_strategy_returns
 
 
 def main():
 
-    # ==========================
-    # LOAD DATA
-    # ==========================
-
-    df = get_data(
-        ticker="AAPL",
-        start_date="2021-01-01",
-        end_date="2026-01-01"
-    )
-
-    # ==========================
-    # BUY & HOLD BENCHMARK
-    # ==========================
+    df = get_data(ticker="AAPL", start_date="2021-01-01", end_date="2026-01-01")
 
     benchmark = buy_and_hold_return(df)
-
-    # ==========================
-    # INDICATORS
-    # ==========================
 
     df["SMA10"] = sma(df, 10)
     df["SMA50"] = sma(df, 50)
@@ -74,113 +56,108 @@ def main():
     df["BB_MIDDLE"] = middle
     df["BB_LOWER"] = lower
 
-    # ==========================
-    # STRATEGIES
-    # ==========================
-
     strategies = {
         "SMA Crossover": SMACrossoverStrategy(),
         "RSI": RSIStrategy(),
         "MACD": MACDStrategy(),
         "Bollinger": BollingerStrategy(),
-        "Price > SMA50": PriceAboveSMAStrategy(),
-        "EMA Crossover": EMACrossoverStrategy()
+        "Price Above SMA50": PriceAboveSMAStrategy(),
+        "EMA Crossover": EMACrossoverStrategy(),
     }
 
-    backtester = Backtester(
-        initial_cash=100000
-    )
+    backtester = Backtester(initial_cash=100000)
 
     strategy_results = []
 
-    # ==========================
-    # RUN ALL STRATEGIES
-    # ==========================
-
     for strategy_name, strategy in strategies.items():
+        print(f"\nRunning: {strategy_name}")
 
         signals = strategy.generate_signals(df)
 
-        results = backtester.run(
-            df,
-            signals
+        results = backtester.run(df, signals)
+
+        portfolio_return = total_return(results["initial_cash"], results["final_value"])
+
+        wr = win_rate(results["trade_log"])
+
+        pf = profit_factor(results["trade_log"])
+
+        mdd = max_drawdown(results["equity_curve"])
+
+        sharpe = sharpe_ratio(results["equity_curve"])
+
+        alpha = portfolio_return - benchmark["return"]
+
+        safe_name = (
+            strategy_name.replace(" ", "_")
+            .replace(">", "GT")
+            .replace("<", "LT")
+            .replace("/", "_")
+            .replace("\\", "_")
+            .replace(":", "_")
+            .replace("*", "_")
+            .replace("?", "_")
+            .replace('"', "_")
+            .replace("|", "_")
         )
 
-        portfolio_return = total_return(
-            results["initial_cash"],
-            results["final_value"]
+        save_trade_log(results["trade_log"], f"{safe_name}_trade_log.csv")
+
+        save_metrics(
+            {
+                "Return": portfolio_return,
+                "Alpha": alpha,
+                "Sharpe": sharpe,
+                "Drawdown": mdd,
+                "Win Rate": wr,
+                "Profit Factor": pf,
+                "Trades": len(results["trade_log"]),
+            },
+            f"{safe_name}_metrics.csv",
         )
 
-        wr = win_rate(
-            results["trade_log"]
+        plot_equity_curve(results["equity_curve"], safe_name)
+
+        plot_drawdown(results["equity_curve"], safe_name)
+
+        strategy_results.append(
+            {
+                "Strategy": strategy_name,
+                "Return": portfolio_return,
+                "Alpha": alpha,
+                "Win Rate": wr,
+                "Profit Factor": pf,
+                "Drawdown": mdd,
+                "Sharpe": sharpe,
+                "Trades": len(results["trade_log"]),
+            }
         )
 
-        pf = profit_factor(
-            results["trade_log"]
-        )
+    strategy_results.sort(key=lambda x: x["Return"], reverse=True)
 
-        mdd = max_drawdown(
-            results["equity_curve"]
-        )
+    strategy_df = pd.DataFrame(strategy_results)
 
-        sharpe = sharpe_ratio(
-            results["equity_curve"]
-        )
+    save_dataframe(strategy_df, "strategy_leaderboard.csv")
 
-        alpha = (
-            portfolio_return
-            - benchmark["return"]
-        )
-
-        strategy_results.append({
-            "Strategy": strategy_name,
-            "Return": portfolio_return,
-            "Alpha": alpha,
-            "Win Rate": wr,
-            "Profit Factor": pf,
-            "Drawdown": mdd,
-            "Sharpe": sharpe,
-            "Trades": len(results["trade_log"])
-        })
-
-    # ==========================
-    # SORT
-    # ==========================
-
-    strategy_results.sort(
-        key=lambda x: x["Return"],
-        reverse=True
-    )
-
-    # ==========================
-    # BENCHMARK
-    # ==========================
+    plot_strategy_returns(strategy_df)
 
     print("\n")
     print("=" * 60)
     print("BUY & HOLD BENCHMARK")
     print("=" * 60)
 
-    print(
-        f"Final Value : ${benchmark['final_value']:.2f}"
-    )
+    print(f"Final Value : ${benchmark['final_value']:.2f}")
 
-    print(
-        f"Return      : {benchmark['return']:.2f}%"
-    )
-
-    # ==========================
-    # LEADERBOARD
-    # ==========================
+    print(f"Return      : {benchmark['return']:.2f}%")
 
     print("\n")
-    print("=" * 120)
+    print("=" * 140)
     print("STRATEGY LEADERBOARD")
-    print("=" * 120)
+    print("=" * 140)
 
     print(
         f"{'Rank':<6}"
-        f"{'Strategy':<20}"
+        f"{'Strategy':<25}"
         f"{'Return %':<12}"
         f"{'Alpha %':<12}"
         f"{'Sharpe':<12}"
@@ -189,16 +166,12 @@ def main():
         f"{'Trades':<10}"
     )
 
-    print("-" * 120)
+    print("-" * 140)
 
-    for rank, result in enumerate(
-        strategy_results,
-        start=1
-    ):
-
+    for rank, result in enumerate(strategy_results, start=1):
         print(
             f"{rank:<6}"
-            f"{result['Strategy']:<20}"
+            f"{result['Strategy']:<25}"
             f"{result['Return']:<12.2f}"
             f"{result['Alpha']:<12.2f}"
             f"{result['Sharpe']:<12.2f}"

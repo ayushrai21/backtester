@@ -1,22 +1,9 @@
-# main.py
-
 from src.data_loader import get_data
 
-from src.indicators import (
-    sma,
-    ema,
-    rsi,
-    macd,
-    bollinger_bands
-)
+from src.indicators import sma, ema, rsi, macd, bollinger_bands
 
 from src.strategies import (
     SMACrossoverStrategy,
-    RSIStrategy,
-    MACDStrategy,
-    BollingerStrategy,
-    PriceAboveSMAStrategy,
-    EMACrossoverStrategy
 )
 
 from src.backtester import Backtester
@@ -26,25 +13,13 @@ from src.metrics import (
     win_rate,
     profit_factor,
     max_drawdown,
-    sharpe_ratio
+    sharpe_ratio,
 )
 
 
 def main():
 
-    # ==========================
-    # LOAD DATA
-    # ==========================
-
-    df = get_data(
-        ticker="AAPL",
-        start_date="2021-01-01",
-        end_date="2026-01-01"
-    )
-
-    # ==========================
-    # INDICATORS
-    # ==========================
+    df = get_data(ticker="AAPL", start_date="2021-01-01", end_date="2026-01-01")
 
     df["SMA10"] = sma(df, 10)
     df["SMA50"] = sma(df, 50)
@@ -66,10 +41,6 @@ def main():
     df["BB_MIDDLE"] = middle
     df["BB_LOWER"] = lower
 
-    # ==========================
-    # SELECT STRATEGY
-    # ==========================
-
     strategy = SMACrossoverStrategy()
 
     # strategy = RSIStrategy()
@@ -80,103 +51,51 @@ def main():
 
     signals = strategy.generate_signals(df)
 
-    # ==========================
-    # RUN BACKTEST
-    # ==========================
+    backtester = Backtester(initial_cash=100000)
 
-    backtester = Backtester(
-        initial_cash=100000
-    )
+    results = backtester.run(df, signals)
 
-    results = backtester.run(
-        df,
-        signals
-    )
+    portfolio_return = total_return(results["initial_cash"], results["final_value"])
 
-    # ==========================
-    # CALCULATE METRICS
-    # ==========================
+    wr = win_rate(results["trade_log"])
 
-    portfolio_return = total_return(
-        results["initial_cash"],
-        results["final_value"]
-    )
+    pf = profit_factor(results["trade_log"])
 
-    wr = win_rate(
-        results["trade_log"]
-    )
+    mdd = max_drawdown(results["equity_curve"])
 
-    pf = profit_factor(
-        results["trade_log"]
-    )
-
-    mdd = max_drawdown(
-        results["equity_curve"]
-    )
-
-    sharpe = sharpe_ratio(
-        results["equity_curve"]
-    )
-
-    # ==========================
-    # PRINT RESULTS
-    # ==========================
+    sharpe = sharpe_ratio(results["equity_curve"])
 
     print("\n" + "=" * 50)
     print("BACKTEST RESULTS")
     print("=" * 50)
 
-    print(
-        f"Initial Capital : ${results['initial_cash']:.2f}"
-    )
+    print(f"Initial Capital : ${results['initial_cash']:.2f}")
 
-    print(
-        f"Final Capital   : ${results['final_value']:.2f}"
-    )
+    print(f"Final Capital   : ${results['final_value']:.2f}")
 
-    print(
-        f"Total Profit    : ${results['profit']:.2f}"
-    )
+    print(f"Total Profit    : ${results['profit']:.2f}")
 
-    print(
-        f"Total Return    : {portfolio_return:.2f}%"
-    )
+    print(f"Total Return    : {portfolio_return:.2f}%")
 
-    print(
-        f"Win Rate        : {wr:.2f}%"
-    )
+    print(f"Win Rate        : {wr:.2f}%")
 
-    print(
-        f"Profit Factor   : {pf:.2f}"
-    )
+    print(f"Profit Factor   : {pf:.2f}")
 
-    print(
-        f"Max Drawdown    : {mdd:.2f}%"
-    )
+    print(f"Max Drawdown    : {mdd:.2f}%")
 
-    print(
-        f"Sharpe Ratio    : {sharpe:.2f}"
-    )
+    print(f"Sharpe Ratio    : {sharpe:.2f}")
 
-    print(
-        f"Total Trades    : {len(results['trade_log'])}"
-    )
+    print(f"Total Trades    : {len(results['trade_log'])}")
 
     print("\n" + "=" * 50)
 
     print("\nSignal Counts")
 
-    print(
-        f"BUY  Signals : {signals.count(1)}"
-    )
+    print(f"BUY  Signals : {signals.count(1)}")
 
-    print(
-        f"SELL Signals : {signals.count(-1)}"
-    )
+    print(f"SELL Signals : {signals.count(-1)}")
 
-    print(
-        f"HOLD Signals : {signals.count(0)}"
-    )
+    print(f"HOLD Signals : {signals.count(0)}")
 
     print("\nFirst 10 Trades")
 
