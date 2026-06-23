@@ -1,5 +1,5 @@
 import pandas as pd
-
+import numpy as np
 
 class SMACrossoverStrategy:
     """
@@ -13,26 +13,13 @@ class SMACrossoverStrategy:
         self.slow_period = slow_period
 
     def generate_signals(self, df: pd.DataFrame) -> list:
-
-        signals = []
-
         fast_col = f"SMA{self.fast_period}"
         slow_col = f"SMA{self.slow_period}"
 
-        for i in range(len(df)):
-            sma_fast = df[fast_col].iloc[i]
-            sma_slow = df[slow_col].iloc[i]
+        signals = np.where(df[fast_col] > df[slow_col], 1, -1)
+        signals[df[fast_col].isna() | df[slow_col].isna()] = 0
 
-            if pd.isna(sma_fast) or pd.isna(sma_slow):
-                signals.append(0)
-
-            elif sma_fast > sma_slow:
-                signals.append(1)
-
-            else:
-                signals.append(-1)
-
-        return signals
+        return signals.tolist()
 
 
 class RSIStrategy:
@@ -43,23 +30,12 @@ class RSIStrategy:
     """
 
     def generate_signals(self, df: pd.DataFrame) -> list:
+        signals = np.zeros(len(df))
+        signals = np.where(df["RSI"] < 30, 1, signals)
+        signals = np.where(df["RSI"] > 70, -1, signals)
 
-        signals = []
-
-        for rsi in df["RSI"]:
-            if pd.isna(rsi):
-                signals.append(0)
-
-            elif rsi < 30:
-                signals.append(1)
-
-            elif rsi > 70:
-                signals.append(-1)
-
-            else:
-                signals.append(0)
-
-        return signals
+        signals[df['RSI'].isna()] = 0
+        return signals.tolist()
 
 
 class MACDStrategy:
@@ -69,23 +45,9 @@ class MACDStrategy:
     """
 
     def generate_signals(self, df: pd.DataFrame) -> list:
-
-        signals = []
-
-        for i in range(len(df)):
-            macd = df["MACD"].iloc[i]
-            signal = df["MACD_SIGNAL"].iloc[i]
-
-            if pd.isna(macd) or pd.isna(signal):
-                signals.append(0)
-
-            elif macd > signal:
-                signals.append(1)
-
-            else:
-                signals.append(-1)
-
-        return signals
+        signals = np.where(df["MACD"] > df["MACD_SIGNAL"], 1, -1)
+        signals[df["MACD"].isna() | df["MACD_SIGNAL"].isna()] = 0
+        return signals.tolist()
 
 
 class BollingerStrategy:
@@ -95,27 +57,14 @@ class BollingerStrategy:
     """
 
     def generate_signals(self, df: pd.DataFrame) -> list:
-
-        signals = []
-
-        for i in range(len(df)):
-            close = df["Close"].iloc[i]
-            upper = df["BB_UPPER"].iloc[i]
-            lower = df["BB_LOWER"].iloc[i]
-
-            if pd.isna(upper) or pd.isna(lower):
-                signals.append(0)
-
-            elif close < lower:
-                signals.append(1)
-
-            elif close > upper:
-                signals.append(-1)
-
-            else:
-                signals.append(0)
-
-        return signals
+        close = df["Close"]
+        signals = np.zeros(len(df))
+        
+        signals = np.where(close < df["BB_LOWER"], 1, signals)
+        signals = np.where(close > df["BB_UPPER"], -1, signals)
+        
+        signals[df["BB_UPPER"].isna()] = 0
+        return signals.tolist()
 
 
 class PriceAboveSMAStrategy:

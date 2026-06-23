@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 
 
 class Backtester:
@@ -13,8 +14,12 @@ class Backtester:
         trade_log = []
         equity_curve = []
 
-        for i in range(len(df)):
-            price = float(df["Close"].iloc[i])
+        # Extract to NumPy arrays before looping to avoid slow .iloc lookups
+        prices = df["Close"].to_numpy()
+        dates = df.index.astype(str).to_numpy()
+
+        for i in range(len(prices)):
+            price = float(prices[i])
             signal = signals[i]
 
             # buy signal
@@ -25,7 +30,7 @@ class Backtester:
                     cash -= cost
                     trade_log.append(
                         {
-                            "Date": str(df.index[i]),
+                            "Date": dates[i],
                             "Type": "BUY",
                             "Price": price,
                             "Shares": shares,
@@ -37,7 +42,7 @@ class Backtester:
                 cash += shares * price
                 trade_log.append(
                     {
-                        "Date": str(df.index[i]),
+                        "Date": dates[i],
                         "Type": "SELL",
                         "Price": price,
                         "Shares": shares,
@@ -49,7 +54,7 @@ class Backtester:
             portfolio_value = cash + shares * price
             equity_curve.append(float(portfolio_value))
 
-        final_value = cash + shares * float(df["Close"].iloc[-1])
+        final_value = cash + shares * float(prices[-1])
 
         return {
             "initial_cash": float(self.initial_cash),
